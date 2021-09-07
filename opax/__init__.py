@@ -1,8 +1,6 @@
 """Pax optimizer library."""
 
-from typing import Sequence
-from .gradient_transformers import scale, chain, clip, GradientTransformer
 
-
-def chain_optimizer(*transformers: Sequence[GradientTransformer]):
-    return lambda params: chain(*transformers)(params).build_optimizer()
+from .base_optimizer import Optimizer
+from .gradient_transformers import GradientTransformation, chain, clip, scale, trace
+from .optimizers import from_chain, sgd
