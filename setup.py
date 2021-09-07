@@ -13,7 +13,7 @@ setup(
     description="Pax/Jax optimizer library",
     author="Thông Nguyễn",
     url=url,
-    keywords=["deep-learning", "jax", "pax", "optimizer", "adam"],
+    keywords=["deep-learning", "jax", "pax", "optimizer", "adam", "sgd"],
     install_requires=install_requires,
     setup_requires=setup_requires,
     tests_require=tests_require,

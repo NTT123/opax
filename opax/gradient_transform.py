@@ -1,4 +1,4 @@
-"""Gradient Transformers."""
+"""Gradient Transformations."""
 
 from typing import Any, Callable, Sequence, Type
 
@@ -6,21 +6,22 @@ import jax
 import jax.numpy as jnp
 import pax
 
-from .base_optimizer import Optimizer
-
 
 class GradientTransformation(pax.Module):
-    def __init__(self, _=None):
+    def __init__(self, params=None):
         super().__init__()
 
     def __call__(self, updates, params=None):
-        del params
-        return updates
+        raise NotImplementedError("A subclass must implement this method")
 
-    def make_optimizer(self) -> Optimizer:
-        optim = Optimizer(None)
-        optim.gradient_transformer = self.copy()
-        return optim
+    def step(self, grads, params):
+        """An optimizing step.
+
+        First, transform gradients
+        Second, apply updates to parameters.
+        """
+        updates = self(grads, params)
+        return jax.tree_map(lambda p, u: p - u, params, updates)
 
 
 def scale(scale: float) -> Type[GradientTransformation]:
@@ -106,6 +107,44 @@ def ema(decay_rate: float, debias: bool = True) -> Type[GradientTransformation]:
             return self.ema
 
     return EMA
+
+
+def scale_by_adam(
+    b1: float = 0.9,
+    b2: float = 0.999,
+    eps: float = 1e-8,
+    eps_root: float = 0.0,
+):
+    class ScaleByAdam(GradientTransformation):
+        mu: Any
+        nu: Any
+        count: jnp.ndarray
+
+        def __init__(self, params):
+            super().__init__(params)
+
+            self.register_state_subtree(
+                "mu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
+            )
+            self.register_state_subtree(
+                "nu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
+            )
+            self.register_state("count", jnp.array(0, dtype=jnp.int32))
+
+        def __call__(self, updates, params=None):
+            del params
+            self.mu = _update_moment(updates, self.mu, b1, order=1)
+            self.nu = _update_moment(updates, self.nu, b2, order=2)
+            self.count = self.count + 1
+            mu_hat = _bias_correction(self.mu, b1, self.count)
+            nu_hat = _bias_correction(self.nu, b2, self.count)
+
+            updates = jax.tree_map(
+                lambda m, v: m / (jnp.sqrt(v + eps_root) + eps), mu_hat, nu_hat
+            )
+            return updates
+
+    return ScaleByAdam
 
 
 def chain(*fs: Callable[[Any], GradientTransformation]) -> Type[GradientTransformation]:
