@@ -2,7 +2,6 @@
 
 `opax` is optimizer library for Jax. It is a reimplementation of [optax] using `Pax`'s stateful [module](https://github.com/ntt123/pax).
 
-
 ## Installation
 
 To install the latest version:
@@ -77,8 +76,3 @@ print(optimizer[-1].learning_rate)
 ```
 
 **Note**: ``learning_rate`` is a property of `ScaleBySchedule` class.
-
-
-
-
-[optax]: https://github.com/deepmind/optax
