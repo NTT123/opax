@@ -1,8 +1,7 @@
-from typing import Any, Callable, Optional, Sequence, Type
+from typing import Optional
 
-from .schedule import LRSchedule, ScheduleOrFloat, lr_schedule
+from .schedule import ScheduleOrFloat
 from .transform import (
-    GradientTransformation,
     add_decayed_weights,
     chain,
     identity,
@@ -16,10 +15,10 @@ from .transform import (
 
 
 def _scale_by_learning_rate(lr: ScheduleOrFloat):
-    if isinstance(lr, LRSchedule):
-        return scale_by_schedule(lr)
-    else:
+    if isinstance(lr, float):
         return scale(lr)
+    else:
+        return scale_by_schedule(lr)
 
 
 def sgd(learning_rate: ScheduleOrFloat = 1e-2, momentum: float = 0.9):

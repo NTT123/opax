@@ -6,8 +6,6 @@ import jax
 import jax.numpy as jnp
 import pax
 
-from opax.schedule import LRSchedule
-
 
 class GradientTransformation(pax.Module):
     def __init__(self, params=None):
@@ -43,20 +41,19 @@ def scale(scale: float):
     return Scale
 
 
-def scale_by_schedule(schedule: LRSchedule):
+def scale_by_schedule(schedule_fn: Callable[[jnp.ndarray], jnp.ndarray]):
     class ScaleBySchedule(GradientTransformation):
         def __init__(self, params):
             super().__init__(params=params)
-            self.schedule = schedule
-
-        @property
-        def learning_rate(self):
-            return self.schedule.learning_rate
+            self.schedule_fn = schedule_fn
+            self.register_state("count", jnp.array(0, dtype=jnp.int32))
+            self.register_state("learning_rate", jnp.array(0.0, dtype=jnp.float32))
 
         def __call__(self, updates, params=None):
             del params
-            scale = self.schedule.step()
-            return jax.tree_map(lambda u: u * scale, updates)
+            self.count = self.count + 1
+            self.learning_rate = self.schedule_fn(self.count)
+            return jax.tree_map(lambda u: u * self.learning_rate, updates)
 
     return ScaleBySchedule
 
@@ -181,7 +178,7 @@ def add_decayed_weights(weight_decay: float = 0.0):
             super().__init__(params=params)
 
         def __call__(self, updates, params):
-            assert params is not None, "exepecting params argument"
+            assert params is not None, "expecting params argument"
 
             updates = jax.tree_map(lambda g, p: g + weight_decay * p, updates, params)
             return updates
