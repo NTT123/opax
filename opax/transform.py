@@ -26,6 +26,14 @@ class GradientTransformation(pax.Module):
         return jax.tree_map(lambda p, u: p - u, params, updates)
 
 
+def identity():
+    class Identity(GradientTransformation):
+        def __call__(self, updates, params):
+            return updates
+
+    return Identity
+
+
 def scale(scale: float):
     class Scale(GradientTransformation):
         def __call__(self, updates, params=None):
@@ -51,6 +59,65 @@ def scale_by_schedule(schedule: LRSchedule):
             return jax.tree_map(lambda u: u * scale, updates)
 
     return ScaleBySchedule
+
+
+def scale_by_stddev(
+    decay_rate: float = 0.9,
+    eps: float = 1e-8,
+    initial_scale: float = 0.0,
+):
+    class ScaleByStddev(GradientTransformation):
+        def __init__(self, params):
+            super().__init__(params=params)
+            self.register_state_subtree(
+                "mu",
+                jax.tree_map(jnp.zeros_likes, params),
+            )
+            self.register_state_subtree(
+                "nu",
+                jax.tree_map(lambda x: jnp.full_like(x, initial_scale), params),
+            )
+
+        def __call__(self, updates, params=None):
+            del params
+            self.mu = _update_moment(updates, self.mu, decay_rate, order=1)
+            self.nu = _update_moment(updates, self.nu, decay_rate, order=2)
+
+            updates = jax.tree_map(
+                lambda g, m, n: g * jax.lax.rsqrt(n - jnp.square(m) + eps),
+                updates,
+                self.mu,
+                self.nu,
+            )
+
+            return updates
+
+    return ScaleByStddev
+
+
+def scale_by_rms(
+    decay_rate: float = 0.9,
+    eps: float = 1e-8,
+    initial_scale: float = 0.0,
+):
+    class ScaleByRms(GradientTransformation):
+        def __init__(self, params):
+            super().__init__(params=params)
+            self.register_state_subtree(
+                "nu", jax.tree_map(lambda x: jnp.full_like(x, initial_scale), params)
+            )
+
+        def __call__(self, updates, params=None):
+            del params
+            self.nu = _update_moment(updates, self.nu, decay_rate, order=2)
+            updates = jax.tree_map(
+                lambda g, n: g * jax.lax.rsqrt(n + eps),
+                updates,
+                self.nu,
+            )
+            return updates
+
+    return ScaleByRms
 
 
 def clip(max_delta: float):

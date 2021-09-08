@@ -1,18 +1,21 @@
-from typing import Any, Callable, Sequence, Type
+from typing import Any, Callable, Optional, Sequence, Type
 
 from .schedule import LRSchedule, ScheduleOrFloat, lr_schedule
 from .transform import (
     GradientTransformation,
     add_decayed_weights,
     chain,
+    identity,
     scale,
     scale_by_adam,
+    scale_by_rms,
     scale_by_schedule,
+    scale_by_stddev,
     trace,
 )
 
 
-def _scale_lr(lr: ScheduleOrFloat):
+def _scale_by_learning_rate(lr: ScheduleOrFloat):
     if isinstance(lr, LRSchedule):
         return scale_by_schedule(lr)
     else:
@@ -22,8 +25,32 @@ def _scale_lr(lr: ScheduleOrFloat):
 def sgd(learning_rate: ScheduleOrFloat = 1e-2, momentum: float = 0.9):
     return chain(
         trace(momentum),
-        _scale_lr(learning_rate),
+        _scale_by_learning_rate(learning_rate),
     )
+
+
+def rmsprop(
+    learning_rate: ScheduleOrFloat = 1e-4,
+    decay_rate: float = 0.9,
+    eps: float = 1e-8,
+    initial_scale: float = 0.0,
+    centered: bool = False,
+    momentum: Optional[float] = None,
+):
+    if centered:
+        return chain(
+            scale_by_stddev(
+                decay_rate=decay_rate, eps=eps, initial_scale=initial_scale
+            ),
+            _scale_by_learning_rate(learning_rate),
+            trace(decay_rate=momentum) if momentum is not None else identity(),
+        )
+    else:
+        return chain(
+            scale_by_rms(decay_rate=decay_rate, eps=eps, initial_scale=initial_scale),
+            _scale_by_learning_rate(learning_rate),
+            trace(decay_rate=momentum) if momentum is not None else identity(),
+        )
 
 
 def adam(
@@ -35,7 +62,7 @@ def adam(
 ):
     return chain(
         scale_by_adam(b1=b1, b2=b2, eps=eps, eps_root=eps_root),
-        _scale_lr(learning_rate),
+        _scale_by_learning_rate(learning_rate),
     )
 
 
@@ -50,5 +77,5 @@ def adamw(
     return chain(
         scale_by_adam(b1=b1, b2=b2, eps=eps, eps_root=eps_root),
         add_decayed_weights(weight_decay=weight_decay),
-        _scale_lr(learning_rate),
+        _scale_by_learning_rate(learning_rate),
     )

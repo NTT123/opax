@@ -88,12 +88,14 @@ test_data = load_dataset("test").shuffle(10 * batch_size).batch(batch_size)
 
 
 for epoch in range(0, 10):
-    losses = 0.0
+    losses, global_norm = 0.0, 0.0
     for batch in tqdm(train_data, desc="train", leave=False):
         batch = jax.tree_map(lambda x: x.numpy(), batch)
         loss, net, optimizer = update_fn(net, optimizer, batch)
         losses = losses + loss
+        global_norm = global_norm + optimizer[0].global_norm
     loss = losses / len(train_data)
+    global_norm = global_norm / len(train_data)
 
     test_losses = 0.0
     for batch in tqdm(test_data, desc="eval", leave=False):
@@ -101,4 +103,6 @@ for epoch in range(0, 10):
         test_losses = test_losses + test_loss_fn(net, batch)
     test_loss = test_losses / len(test_data)
 
-    print(f"[Epoch {epoch}]  train loss {loss:.3f}  test loss {test_loss:.3f}")
+    print(
+        f"[Epoch {epoch}]  train loss {loss:.3f}  test loss {test_loss:.3f}  global norm {global_norm:.3f}"
+    )

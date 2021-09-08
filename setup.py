@@ -10,7 +10,7 @@ tests_require = []
 setup(
     name="opax",
     version=__version__,
-    description="Pax/Jax optimizer library",
+    description="A stateful optimizer library for Jax",
     author="Thông Nguyễn",
     url=url,
     keywords=["deep-learning", "jax", "pax", "optimizer", "adam", "sgd"],
