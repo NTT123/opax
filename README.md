@@ -76,3 +76,6 @@ print(optimizer[-1].learning_rate)
 ```
 
 **Note**: ``learning_rate`` is a property of `ScaleBySchedule` class.
+
+
+[optax]: https://optax.readthedocs.io/en/latest/
