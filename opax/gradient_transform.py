@@ -1,6 +1,6 @@
 """Gradient Transformations."""
 
-from typing import Any, Callable, Sequence, Type
+from typing import Any, Callable, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -24,7 +24,7 @@ class GradientTransformation(pax.Module):
         return jax.tree_map(lambda p, u: p - u, params, updates)
 
 
-def scale(scale: float) -> Type[GradientTransformation]:
+def scale(scale: float):
     class Scale(GradientTransformation):
         def __call__(self, updates, params=None):
             del params
@@ -33,7 +33,7 @@ def scale(scale: float) -> Type[GradientTransformation]:
     return Scale
 
 
-def clip(max_delta: float) -> Type[GradientTransformation]:
+def clip(max_delta: float):
     class Clip(GradientTransformation):
         def __call__(self, updates, params=None):
             del params
@@ -44,19 +44,27 @@ def clip(max_delta: float) -> Type[GradientTransformation]:
     return Clip
 
 
-def clip_by_global_norm(global_norm: float) -> Type[GradientTransformation]:
+def clip_by_global_norm(global_norm: float):
     class ClipByGlobalNorm(GradientTransformation):
+
+        norm: jnp.ndarray  # for logging purposes.
+
+        def __init__(self, params):
+            super().__init__(params=params)
+            self.register_state("global_norm", jnp.array(-1.0))
+
         def __call__(self, updates, params=None):
             leaves = jax.tree_leaves(updates)
             leaves = jax.tree_map(lambda x: jnp.sum(jnp.square(x)), leaves)
             norm = jnp.sqrt(jnp.sum(jnp.stack(leaves)))
+            self.norm = norm
             scale = jnp.clip(global_norm / norm, a_max=1.0)
             return jax.tree_map(lambda x: x * scale, updates)
 
     return ClipByGlobalNorm
 
 
-def trace(decay_rate) -> Type[GradientTransformation]:
+def trace(decay_rate):
     class Trace(GradientTransformation):
         trace: Any
 
@@ -67,8 +75,11 @@ def trace(decay_rate) -> Type[GradientTransformation]:
                 "trace", jax.tree_map(lambda x: jnp.zeros_like(x), params)
             )
 
-        def __call__(self, updates, params=None):
-            return jax.tree_map(lambda u, t: u + t * decay_rate, updates, self.trace)
+        def __call__(self, updates, params=None) -> Updates:
+            self.trace = jax.tree_map(
+                lambda u, t: u + t * decay_rate, updates, self.trace
+            )
+            return self.trace
 
     return Trace
 
@@ -81,13 +92,14 @@ def _update_moment(updates, moments, decay, order):
     )
 
 
+# source: https://github.com/deepmind/optax/blob/3f42a614096a7cd778e8cab15fd55e4766f47b53/optax/_src/transform.py#L84
 def _bias_correction(moment, decay, count):
     """Perform bias correction. This becomes a no-op as count goes to infinity."""
     bias_correction = 1 - decay ** count
     return jax.tree_map(lambda t: t / bias_correction.astype(t.dtype), moment)
 
 
-def ema(decay_rate: float, debias: bool = True) -> Type[GradientTransformation]:
+def ema(decay_rate: float, debias: bool = True):
     class EMA(GradientTransformation):
         ema: Any
 
@@ -147,7 +159,7 @@ def scale_by_adam(
     return ScaleByAdam
 
 
-def chain(*fs: Callable[[Any], GradientTransformation]) -> Type[GradientTransformation]:
+def chain(*fs: Callable[[Any], GradientTransformation]):
     class Chain(GradientTransformation):
         transforms: Sequence[GradientTransformation]
 
