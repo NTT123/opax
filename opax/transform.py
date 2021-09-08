@@ -6,6 +6,8 @@ import jax
 import jax.numpy as jnp
 import pax
 
+from opax.schedule import LRSchedule
+
 
 class GradientTransformation(pax.Module):
     def __init__(self, params=None):
@@ -31,6 +33,20 @@ def scale(scale: float):
             return jax.tree_map(lambda u: u * scale, updates)
 
     return Scale
+
+
+def scale_by_schedule(schedule: LRSchedule):
+    class ScaleBySchedule(GradientTransformation):
+        def __init__(self, params):
+            super().__init__(params=params)
+            self.schedule = schedule
+
+        def __call__(self, updates, params=None):
+            del params
+            scale = self.schedule.step()
+            return jax.tree_map(lambda u: u * scale, updates)
+
+    return ScaleBySchedule
 
 
 def clip(max_delta: float):

@@ -1,6 +1,8 @@
 """Pax optimizer library."""
 
-from .gradient_transform import (
+from . import optimizer, schedule
+from .optimizer import adam, adamw, sgd
+from .transform import (
     GradientTransformation,
     chain,
     clip,
@@ -8,4 +10,3 @@ from .gradient_transform import (
     scale,
     trace,
 )
-from .optimizer import adam, adamw, sgd
