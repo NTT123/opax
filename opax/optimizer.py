@@ -15,7 +15,7 @@ from .transform import (
 
 
 def _scale_by_learning_rate(lr: ScheduleOrFloat):
-    if isinstance(lr, float):
+    if callable(lr):
         return scale(lr)
     else:
         return scale_by_schedule(lr)
