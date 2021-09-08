@@ -8,7 +8,7 @@
 To create an optimizer:
 
 ```python
-import optax
+import opax
 optimizer = opax.adam(1e-4)(parameters)
 ```
 
