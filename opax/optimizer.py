@@ -16,9 +16,9 @@ from .transform import (
 
 def _scale_by_learning_rate(lr: ScheduleOrFloat):
     if callable(lr):
-        return scale(lr)
-    else:
         return scale_by_schedule(lr)
+    else:
+        return scale(lr)
 
 
 def sgd(learning_rate: ScheduleOrFloat = 1e-2, momentum: float = 0.9):
