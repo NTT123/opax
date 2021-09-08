@@ -3,6 +3,14 @@
 `opax` is optimizer library for Jax. It is a reimplementation of [optax] using `Pax`'s stateful [module](https://github.com/ntt123/pax).
 
 
+## Installation
+
+To install the latest version:
+
+```sh
+pip3 install git+https://github.com/NTT123/opax.git
+```
+
 ## Getting started
 
 To create an optimizer:

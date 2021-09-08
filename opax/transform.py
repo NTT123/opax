@@ -43,6 +43,9 @@ def scale(scale: float):
 
 def scale_by_schedule(schedule_fn: Callable[[jnp.ndarray], jnp.ndarray]):
     class ScaleBySchedule(GradientTransformation):
+        count: jnp.ndarray
+        learning_rate: jnp.ndarray
+
         def __init__(self, params):
             super().__init__(params=params)
             self.schedule_fn = schedule_fn
@@ -128,25 +131,20 @@ def clip(max_delta: float):
     return Clip
 
 
-def clip_by_global_norm(global_norm: float):
+def clip_by_global_norm(max_global_norm: float):
     class ClipByGlobalNorm(GradientTransformation):
-
-        _norm: jnp.ndarray  # for logging purposes.
+        global_norm: jnp.ndarray  # for logging purposes.
 
         def __init__(self, params):
             super().__init__(params=params)
-            self.register_state("_norm", jnp.array(-1.0))
-
-        @property
-        def global_norm(self):
-            return self._norm
+            self.register_state("global_norm", jnp.array(0.0))
 
         def __call__(self, updates, params=None):
+            del params
             leaves = jax.tree_leaves(updates)
             leaves = jax.tree_map(lambda x: jnp.sum(jnp.square(x)), leaves)
-            norm = jnp.sqrt(jnp.sum(jnp.stack(leaves)))
-            self._norm = norm
-            scale = jnp.clip(global_norm / norm, a_max=1.0)
+            self.global_norm = jnp.sqrt(jnp.sum(jnp.stack(leaves)))
+            scale = jnp.clip(max_global_norm / self.global_norm, a_max=1.0)
             return jax.tree_map(lambda x: x * scale, updates)
 
     return ClipByGlobalNorm
