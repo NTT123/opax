@@ -8,4 +8,4 @@ from .gradient_transform import (
     scale,
     trace,
 )
-from .optimizer import adam, sgd
+from .optimizer import adam, adamw, sgd

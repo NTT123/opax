@@ -51,7 +51,7 @@ def clip_by_global_norm(global_norm: float):
 
         def __init__(self, params):
             super().__init__(params=params)
-            self.register_state("global_norm", jnp.array(-1.0))
+            self.register_state("norm", jnp.array(-1.0))
 
         def __call__(self, updates, params=None):
             leaves = jax.tree_leaves(updates)
@@ -75,13 +75,27 @@ def trace(decay_rate):
                 "trace", jax.tree_map(lambda x: jnp.zeros_like(x), params)
             )
 
-        def __call__(self, updates, params=None) -> Updates:
+        def __call__(self, updates, params=None):
             self.trace = jax.tree_map(
                 lambda u, t: u + t * decay_rate, updates, self.trace
             )
             return self.trace
 
     return Trace
+
+
+def add_decayed_weights(weight_decay: float = 0.0):
+    class AddDecayedWeights(GradientTransformation):
+        def __init__(self, params):
+            super().__init__(params=params)
+
+        def __call__(self, updates, params):
+            assert params is not None, "exepecting params argument"
+
+            updates = jax.tree_map(lambda g, p: g + weight_decay * p, updates, params)
+            return updates
+
+    return AddDecayedWeights
 
 
 # source: https://github.com/deepmind/optax/blob/3f42a614096a7cd778e8cab15fd55e4766f47b53/optax/_src/transform.py#L78
