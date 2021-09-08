@@ -2,13 +2,20 @@
 
 `opax` is optimizer library for Jax. It is a reimplementation of [optax] using `Pax`'s stateful [module](https://github.com/ntt123/pax).
 
+## Installation
+
+To install the latest version:
+
+```sh
+pip3 install git+https://github.com/NTT123/opax.git
+```
 
 ## Getting started
 
 To create an optimizer:
 
 ```python
-import opax
+import optax
 optimizer = opax.adam(1e-4)(parameters)
 ```
 
@@ -69,8 +76,3 @@ print(optimizer[-1].learning_rate)
 ```
 
 **Note**: ``learning_rate`` is a property of `ScaleBySchedule` class.
-
-
-
-
-[optax]: https://github.com/deepmind/optax
