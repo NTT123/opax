@@ -41,6 +41,10 @@ def scale_by_schedule(schedule: LRSchedule):
             super().__init__(params=params)
             self.schedule = schedule
 
+        @property
+        def learning_rate(self):
+            return self.schedule.learning_rate
+
         def __call__(self, updates, params=None):
             del params
             scale = self.schedule.step()
@@ -63,17 +67,21 @@ def clip(max_delta: float):
 def clip_by_global_norm(global_norm: float):
     class ClipByGlobalNorm(GradientTransformation):
 
-        norm: jnp.ndarray  # for logging purposes.
+        _norm: jnp.ndarray  # for logging purposes.
 
         def __init__(self, params):
             super().__init__(params=params)
-            self.register_state("norm", jnp.array(-1.0))
+            self.register_state("_norm", jnp.array(-1.0))
+
+        @property
+        def global_norm(self):
+            return self._norm
 
         def __call__(self, updates, params=None):
             leaves = jax.tree_leaves(updates)
             leaves = jax.tree_map(lambda x: jnp.sum(jnp.square(x)), leaves)
             norm = jnp.sqrt(jnp.sum(jnp.stack(leaves)))
-            self.norm = norm
+            self._norm = norm
             scale = jnp.clip(global_norm / norm, a_max=1.0)
             return jax.tree_map(lambda x: x * scale, updates)
 
@@ -203,5 +211,8 @@ def chain(*fs: Callable[[Any], GradientTransformation]):
                 updates = f(updates=updates, params=params)
 
             return updates
+
+        def __getitem__(self, index: int):
+            return self.transforms[index]
 
     return Chain

@@ -50,3 +50,15 @@ def test_trace():
     np.testing.assert_almost_equal(t.trace, 0.9)
     t(x)
     np.testing.assert_almost_equal(t.trace, 0.9 * 0.9 + 1.0)
+
+
+def test_opax_global_norm():
+    model = pax.nn.Linear(3, 3)
+    opt = opax.chain(
+        opax.clip_by_global_norm(1.0),
+        opax.scale(1e-3),
+    )(model.parameters())
+    params = model.parameters()
+    params = opt.step(params, params)
+
+    assert opt[0].global_norm >= 0.0
