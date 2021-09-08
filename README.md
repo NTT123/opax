@@ -15,7 +15,7 @@ pip3 install git+https://github.com/NTT123/opax.git
 To create an optimizer:
 
 ```python
-import optax
+import opax
 optimizer = opax.adam(1e-4)(parameters)
 ```
 
