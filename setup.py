@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 url = "https://github.com/ntt123/opax"
 
 install_requires = ["pax"]
