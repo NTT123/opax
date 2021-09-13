@@ -7,7 +7,7 @@
 To install the latest version:
 
 ```sh
-pip3 install git+https://github.com/NTT123/opax.git
+pip3 install git+https://github.com/ntt123/opax.git
 ```
 
 ## Getting started
@@ -24,7 +24,7 @@ optimizer = opax.adam(1e-4)(parameters)
 To update parameters:
 
 ```python
-new_parameters = optimizers.step(gradients, parameters)
+new_parameters = optimizer.step(gradients, parameters)
 ```
 
 **Note**: ``gradients`` has the same `treedef` as `parameters`.
@@ -36,7 +36,7 @@ new_parameters = optimizers.step(gradients, parameters)
 ```python
 optimizer = opax.chain(
     opax.clip_by_global_norm(1.0),
-    opax.scale_by_adam(1.0),
+    opax.scale_by_adam(),
     opax.scale(1e-4),
 )(parameters)
 ```
@@ -52,7 +52,7 @@ def staircase_schedule_fn(step: jnp.ndarray):
 
 optimizer = opax.chain(
     opax.clip_by_global_norm(1.0),
-    opax.scale_by_adam(1.),
+    opax.scale_by_adam(),
     opax.scale_by_schedule(staircase_schedule_fn),
 )(parameters)
 ```
