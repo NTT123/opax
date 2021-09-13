@@ -62,3 +62,18 @@ def test_opax_global_norm():
     params = opt.step(params, params)
 
     assert opt[0].global_norm >= 0.0
+
+
+def test_all_finite_predicate():
+    model = pax.nn.Linear(3, 3)
+    opt = opax.chain(
+        opax.clip_by_global_norm(1.0),
+        opax.adam(1e-3),
+    )(model.parameters())
+    params = model.parameters()
+    params = opt.step(params, params, all_finite=jnp.array(False))
+    assert opt[-1][0].count.item() == 0
+    params = opt.step(params, params, all_finite=jnp.array(True))
+    assert opt[-1][0].count.item() == 1
+    params = opt.step(params, params, all_finite=jnp.array(False))
+    assert opt[-1][0].count.item() == 1

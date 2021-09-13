@@ -1,10 +1,14 @@
 """Gradient Transformations."""
 
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Optional, Sequence, TypeVar
 
 import jax
 import jax.numpy as jnp
 import pax
+
+from .utils import select_tree
+
+T = TypeVar("T")
 
 
 class GradientTransformation(pax.Module):
@@ -14,14 +18,31 @@ class GradientTransformation(pax.Module):
     def __call__(self, updates, params=None):
         raise NotImplementedError("A subclass must implement this method")
 
-    def step(self, grads, params):
+    def step(self, grads, params, all_finite: Optional[bool] = None):
         """An optimizing step.
 
         First, transform gradients
         Second, apply updates to parameters.
+
+        If `all_finite` is False, no update is applied.
+
+        Arguments:
+            grads: The gradients.
+            params: The model parameters that will be updated.
+            all_finite: if the gradients are all finite. Default: `None`.
         """
-        updates = self(grads, params)
-        return jax.tree_map(lambda p, u: p - u, params, updates)
+        if all_finite is None:
+            updates = self(grads, params)
+            return jax.tree_map(lambda p, u: p - u, params, updates)
+        else:
+            clone = self.copy()
+            updates = self(grads, params)
+            new_params = jax.tree_map(lambda p, u: p - u, params, updates)
+            finite_params, finite_self = select_tree(
+                all_finite, (new_params, self), (params, clone)
+            )
+            self.update(finite_self, in_place=True)
+            return finite_params
 
 
 def identity():
