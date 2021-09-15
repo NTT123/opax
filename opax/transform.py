@@ -31,6 +31,14 @@ class GradientTransformation(pax.Module):
             params: The model parameters that will be updated.
             all_finite: if the gradients are all finite. Default: `None`.
         """
+        if jax.tree_structure(grads) != jax.tree_structure(params):
+            raise ValueError(
+                f"Mismatched between `grads` and `params` tree structures.\n"
+                f"Usually, this is due to a modification in the forward pass.\n\n"
+                f"[grads]\n{jax.tree_structure(grads)}\n\n"
+                f"========\n\n"
+                f"[params]\n{jax.tree_structure(params)}\n"
+            )
         if all_finite is None:
             updates = self(grads, params)
             return jax.tree_map(lambda p, u: p - u, params, updates)

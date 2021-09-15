@@ -1,7 +1,9 @@
+import jax
 import jax.numpy as jnp
 import numpy as np
 import opax
 import pax
+import pytest
 
 
 def test_opax_1():
@@ -77,3 +79,36 @@ def test_all_finite_predicate():
     assert opt[-1][0].count.item() == 1
     params = opt.step(params, params, all_finite=jnp.array(False))
     assert opt[-1][0].count.item() == 1
+
+
+def test_train_1():
+    net = pax.nn.Linear(1, 1)
+
+    def loss_fn(params, model, inputs) -> pax.utils.LossFnOutput:
+        loss = jnp.mean(jnp.square(model.update(params)(inputs[0]) - inputs[1]))
+        return loss, (loss, model)
+
+    update_fn = pax.utils.build_update_fn(loss_fn)
+    x = jnp.zeros((1, 1))
+    opt = opax.adam()(net.parameters())
+    for i in range(10):
+        loss, net, opt = update_fn(net, opt, (x, x))
+
+
+def test_train_2():
+    net = pax.nn.Sequential(
+        pax.nn.Linear(1, 2),
+        pax.nn.Linear(2, 1),
+    )
+
+    def loss_fn(params, model, inputs) -> pax.utils.LossFnOutput:
+        loss = jnp.mean(jnp.square(model.update(params)(inputs[0]) - inputs[1]))
+        model.modules[-1] = pax.utils.Lambda(jax.nn.relu)
+        return loss, (loss, model)
+
+    update_fn = pax.utils.build_update_fn(loss_fn)
+    x = jnp.zeros((1, 1))
+    opt = opax.adam()(net.parameters())
+    with pytest.raises(ValueError):
+        for i in range(10):
+            loss, net, opt = update_fn(net, opt, (x, x))
