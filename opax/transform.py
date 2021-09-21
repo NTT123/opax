@@ -18,7 +18,7 @@ class GradientTransformation(pax.Module):
     def __call__(self, updates, params=None):
         raise NotImplementedError("A subclass must implement this method")
 
-    def step(self, grads, params, all_finite: Optional[bool] = None):
+    def step(self, grads, params, all_finite: Optional[jnp.ndarray] = None):
         """An optimizing step.
 
         First, transform gradients
@@ -291,15 +291,36 @@ def scale_by_adam(
 def chain(*fs: Callable[[Any], GradientTransformation]):
     class Chain(GradientTransformation):
         transforms: Sequence[GradientTransformation]
+        flatten: bool
 
-        def __init__(self, params):
+        def __init__(self, params, flatten: bool = False):
+            """Create a chain of gradient transformations.
+
+            Arguments:
+                params: trainable parameters.
+                flatten: flatten trainable parameters to a list for faster speed in jit mode.
+            """
             super().__init__()
-            transforms = [f(params) for f in fs]
+            self.flatten = flatten
+            if flatten:
+                leaves = jax.tree_leaves(params)
+                transforms = [f(leaves) for f in fs]
+            else:
+                transforms = [f(params) for f in fs]
             self.register_module_subtree("transforms", transforms)
 
         def __call__(self, updates, params=None):
-            for f in self.transforms:
-                updates = f(updates=updates, params=params)
+            if self.flatten:
+                updates_leaves, updates_treedef = jax.tree_flatten(updates)
+                params_leaves = jax.tree_leaves(params)
+
+                for f in self.transforms:
+                    updates_leaves = f(updates=updates_leaves, params=params_leaves)
+
+                updates = jax.tree_unflatten(updates_treedef, updates_leaves)
+            else:
+                for f in self.transforms:
+                    updates = f(updates=updates, params=params)
 
             return updates
 

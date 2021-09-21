@@ -112,3 +112,20 @@ def test_train_2():
     with pytest.raises(ValueError):
         for i in range(10):
             loss, net, opt = update_fn(net, opt, (x, x))
+
+
+def test_train_flatten():
+    net = pax.nn.Sequential(
+        pax.nn.Linear(1, 2),
+        pax.nn.Linear(2, 1),
+    )
+
+    def loss_fn(params, model, inputs) -> pax.utils.LossFnOutput:
+        loss = jnp.mean(jnp.square(model.update(params)(inputs[0]) - inputs[1]))
+        return loss, (loss, model)
+
+    update_fn = pax.utils.build_update_fn(loss_fn)
+    x = jnp.zeros((1, 1))
+    opt = opax.adam()(net.parameters(), flatten=True)
+    for i in range(10):
+        loss, net, opt = update_fn(net, opt, (x, x))
