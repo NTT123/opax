@@ -78,8 +78,8 @@ def scale_by_schedule(schedule_fn: Callable[[jnp.ndarray], jnp.ndarray]):
         def __init__(self, params):
             super().__init__(params=params)
             self.schedule_fn = schedule_fn
-            self.register_state("count", jnp.array(0, dtype=jnp.int32))
-            self.register_state("learning_rate", jnp.array(0.0, dtype=jnp.float32))
+            self.register_states("count", jnp.array(0, dtype=jnp.int32))
+            self.register_states("learning_rate", jnp.array(0.0, dtype=jnp.float32))
 
         def __call__(self, updates, params=None):
             del params
@@ -98,11 +98,11 @@ def scale_by_stddev(
     class ScaleByStddev(GradientTransformation):
         def __init__(self, params):
             super().__init__(params=params)
-            self.register_state_subtree(
+            self.register_states(
                 "mu",
                 jax.tree_map(jnp.zeros_likes, params),
             )
-            self.register_state_subtree(
+            self.register_states(
                 "nu",
                 jax.tree_map(lambda x: jnp.full_like(x, initial_scale), params),
             )
@@ -132,7 +132,7 @@ def scale_by_rms(
     class ScaleByRms(GradientTransformation):
         def __init__(self, params):
             super().__init__(params=params)
-            self.register_state_subtree(
+            self.register_states(
                 "nu", jax.tree_map(lambda x: jnp.full_like(x, initial_scale), params)
             )
 
@@ -166,7 +166,7 @@ def clip_by_global_norm(max_global_norm: float):
 
         def __init__(self, params):
             super().__init__(params=params)
-            self.register_state("global_norm", jnp.array(0.0))
+            self.register_states("global_norm", jnp.array(0.0))
 
         def __call__(self, updates, params=None):
             del params
@@ -186,7 +186,7 @@ def trace(decay_rate):
         def __init__(self, params):
             super().__init__()
 
-            self.register_state_subtree(
+            self.register_states(
                 "trace", jax.tree_map(lambda x: jnp.zeros_like(x), params)
             )
 
@@ -234,8 +234,8 @@ def ema(decay_rate: float, debias: bool = True):
 
         def __init__(self, params):
             super().__init__()
-            self.register_state("count", jnp.array(0, dtype=jnp.int32))
-            self.register_state_subtree(
+            self.register_states("count", jnp.array(0, dtype=jnp.int32))
+            self.register_states(
                 "ema", jax.tree_map(lambda x: jnp.zeros_like(x), params)
             )
 
@@ -264,13 +264,13 @@ def scale_by_adam(
         def __init__(self, params):
             super().__init__(params)
 
-            self.register_state_subtree(
+            self.register_states(
                 "mu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
             )
-            self.register_state_subtree(
+            self.register_states(
                 "nu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
             )
-            self.register_state("count", jnp.array(0, dtype=jnp.int32))
+            self.register_states("count", jnp.array(0, dtype=jnp.int32))
 
         def __call__(self, updates, params=None):
             del params
@@ -307,7 +307,7 @@ def chain(*fs: Callable[[Any], GradientTransformation]):
                 transforms = [f(leaves) for f in fs]
             else:
                 transforms = [f(params) for f in fs]
-            self.register_module_subtree("transforms", transforms)
+            self.register_modules("transforms", transforms)
 
         def __call__(self, updates, params=None):
             if self.flatten:
