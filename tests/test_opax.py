@@ -15,7 +15,8 @@ def test_opax_1():
         opax.scale(learning_rate),
     )(model.parameters())
     params = model.parameters()
-    params = opt.step(params, params)
+    updates = opt(params, params)
+    params = opax.apply_updates(params, updates)
 
 
 def test_opax_sgd():
@@ -24,7 +25,8 @@ def test_opax_sgd():
         opax.sgd(1e-2, 0.9),
     )(model.parameters())
     params = model.parameters()
-    params = opt.step(params, params)
+    updates = opt(params, params)
+    params = opax.apply_updates(params, updates)
 
 
 def test_opax_step_sgd():
@@ -33,14 +35,16 @@ def test_opax_step_sgd():
         opax.sgd(1e-2, 0.9),
     )(model.parameters())
     params = model.parameters()
-    params = opt.step(params, params)
+    updates = opt(params, params)
+    params = opax.apply_updates(params, updates)
 
 
 def test_opax_adam():
     model = pax.nn.Linear(3, 3)
     opt = opax.adam(1e-3)(model.parameters())
     params = model.parameters()
-    params = opt.step(params, params)
+    updates = opt(params, params)
+    params = opax.apply_updates(params, updates)
 
 
 def test_trace():
@@ -61,38 +65,44 @@ def test_opax_global_norm():
         opax.scale(1e-3),
     )(model.parameters())
     params = model.parameters()
-    params = opt.step(params, params)
+    updates = opt(params, params)
+    params = opax.apply_updates(params, updates)
 
     assert opt[0].global_norm >= 0.0
 
 
-def test_all_finite_predicate():
-    model = pax.nn.Linear(3, 3)
-    opt = opax.chain(
-        opax.clip_by_global_norm(1.0),
-        opax.adam(1e-3),
-    )(model.parameters())
-    params = model.parameters()
-    params = opt.step(params, params, all_finite=jnp.array(False))
-    assert opt[-1][0].count.item() == 0
-    params = opt.step(params, params, all_finite=jnp.array(True))
-    assert opt[-1][0].count.item() == 1
-    params = opt.step(params, params, all_finite=jnp.array(False))
-    assert opt[-1][0].count.item() == 1
+# def test_all_finite_predicate():
+#     model = pax.nn.Linear(3, 3)
+#     opt = opax.chain(
+#         opax.clip_by_global_norm(1.0),
+#         opax.adam(1e-3),
+#     )(model.parameters())
+#     params = model.parameters()
+#     params = opt.step(params, params, all_finite=jnp.array(False))
+#     assert opt[-1][0].count.item() == 0
+#     params = opt.step(params, params, all_finite=jnp.array(True))
+#     assert opt[-1][0].count.item() == 1
+#     params = opt.step(params, params, all_finite=jnp.array(False))
+#     assert opt[-1][0].count.item() == 1
 
 
 def test_train_1():
     net = pax.nn.Linear(1, 1)
 
-    def loss_fn(params, model, inputs) -> pax.utils.LossFnOutput:
-        loss = jnp.mean(jnp.square(model.update(params)(inputs[0]) - inputs[1]))
-        return loss, (loss, model)
+    def loss_fn(model, inputs):
+        loss = jnp.mean(jnp.square(model(inputs[0]) - inputs[1]))
+        return loss, model
 
-    update_fn = pax.utils.build_update_fn(loss_fn)
+    def update_fn(model, optimizer, inputs):
+        (loss, model), grads = jax.value_and_grad(loss_fn, has_aux=True)(model, inputs)
+        updates = optimizer(grads)
+        model = model.update_parameters(opax.apply_updates(model.parameters(), updates))
+        return model, optimizer, loss
+
     x = jnp.zeros((1, 1))
     opt = opax.adam()(net.parameters())
-    for i in range(10):
-        loss, net, opt = update_fn(net, opt, (x, x))
+    for _ in range(10):
+        net, opt, _ = update_fn(net, opt, (x, x))
 
 
 def test_train_2():
@@ -101,17 +111,21 @@ def test_train_2():
         pax.nn.Linear(2, 1),
     )
 
-    def loss_fn(params, model, inputs) -> pax.utils.LossFnOutput:
-        loss = jnp.mean(jnp.square(model.update(params)(inputs[0]) - inputs[1]))
-        model.modules[-1] = pax.utils.Lambda(jax.nn.relu)
-        return loss, (loss, model)
+    def loss_fn(model, inputs):
+        loss = jnp.mean(jnp.square(model(inputs[0]) - inputs[1]))
+        model[-1] = pax.nn.Lambda(jax.nn.relu)
+        return loss, model
 
-    update_fn = pax.utils.build_update_fn(loss_fn)
+    def update_fn(model, optimizer, inputs):
+        (loss, model), grads = jax.value_and_grad(loss_fn, has_aux=True)(model, inputs)
+        model, optimizer = pax.apply_gradients(model, optimizer, grads=grads)
+        return model, optimizer, loss
+
     x = jnp.zeros((1, 1))
     opt = opax.adam()(net.parameters())
-    with pytest.raises(ValueError):
-        for i in range(10):
-            loss, net, opt = update_fn(net, opt, (x, x))
+    with pytest.raises((AssertionError, ValueError)):
+        for _ in range(10):
+            net, opt, _ = update_fn(net, opt, (x, x))
 
 
 def test_train_flatten():
@@ -120,12 +134,16 @@ def test_train_flatten():
         pax.nn.Linear(2, 1),
     )
 
-    def loss_fn(params, model, inputs) -> pax.utils.LossFnOutput:
-        loss = jnp.mean(jnp.square(model.update(params)(inputs[0]) - inputs[1]))
-        return loss, (loss, model)
+    def loss_fn(model, inputs):
+        loss = jnp.mean(jnp.square(model(inputs[0]) - inputs[1]))
+        return loss, model
 
-    update_fn = pax.utils.build_update_fn(loss_fn)
+    def update_fn(model, optimizer, inputs):
+        (loss, model), grads = jax.value_and_grad(loss_fn, has_aux=True)(model, inputs)
+        model, optimizer = pax.apply_gradients(model, optimizer, grads=grads)
+        return model, optimizer, loss
+
     x = jnp.zeros((1, 1))
     opt = opax.adam()(net.parameters(), flatten=True)
-    for i in range(10):
-        loss, net, opt = update_fn(net, opt, (x, x))
+    for _ in range(10):
+        net, opt, _ = update_fn(net, opt, (x, x))

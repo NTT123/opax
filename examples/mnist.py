@@ -26,12 +26,11 @@ class ConvNet(pax.Module):
 
     def __init__(self):
         super().__init__()
-        layers = []
+        self.layers = []
         for i in range(5):
             conv = pax.nn.Conv2D((1 if i == 0 else 32), 32, 6, padding="VALID")
             bn = pax.nn.BatchNorm2D(32, True, True, 0.9)
-            layers.append((conv, bn))
-        self.register_modules("layers", layers)
+            self.layers.append((conv, bn))
         self.output = pax.nn.Conv2D(32, 10, 3, padding="VALID")
 
     def __call__(self, x: jnp.ndarray):
@@ -42,8 +41,7 @@ class ConvNet(pax.Module):
         return jnp.squeeze(x, (1, 2))
 
 
-def loss_fn(params: ConvNet, model: ConvNet, batch: Batch):
-    model = model.update(params)
+def loss_fn(model: ConvNet, batch: Batch):
     x = batch["image"].astype(jnp.float32) / 255
     target = batch["label"]
     logits = model(x)
@@ -56,17 +54,17 @@ def loss_fn(params: ConvNet, model: ConvNet, batch: Batch):
 @jax.jit
 def test_loss_fn(model: ConvNet, batch: Batch):
     model = model.eval()
-    return loss_fn(model.parameters(), model, batch)[0]
+    return loss_fn(model, batch)[0]
 
 
 @jax.jit
 def update_fn(model: ConvNet, optimizer: opax.GradientTransformation, batch: Batch):
+    grads, (loss, model) = jax.grad(loss_fn, has_aux=True, allow_int=int)(model, batch)
     params = model.parameters()
-    grads, (loss, model) = jax.grad(loss_fn, has_aux=True)(params, model, batch)
-    model = model.update(
-        optimizer.step(grads, model.parameters()),
-    )
-    return loss, model, optimizer
+    updates = optimizer(grads.parameters(), params=params)
+    new_params = pax.apply_updates(params, updates=updates)
+    model = model.update_parameters(new_params)
+    return model, optimizer, loss
 
 
 net = ConvNet()
@@ -91,7 +89,7 @@ for epoch in range(0, 10):
     losses, global_norm = 0.0, 0.0
     for batch in tqdm(train_data, desc="train", leave=False):
         batch = jax.tree_map(lambda x: x.numpy(), batch)
-        loss, net, optimizer = update_fn(net, optimizer, batch)
+        net, optimizer, loss = update_fn(net, optimizer, batch)
         losses = losses + loss
         global_norm = global_norm + optimizer[0].global_norm
     loss = losses / len(train_data)
