@@ -25,7 +25,7 @@ To update parameters:
 
 ```python
 updates, optimizer = opax.transfrom_gradients(gradients, optimizer, parameters)
-parameters = opax.apply_update(parameters, updates)
+parameters = opax.apply_updates(parameters, updates)
 ```
 
 **Note**: ``gradients`` has the same `treedef` as `parameters`.
