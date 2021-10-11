@@ -70,8 +70,11 @@ def apply_gradients(
         - **new_optimizer**: the updated optimizer.
     """
     assert isinstance(model, Module), "Expecting a PAX Module."
+    assert type(model) is type(grads)
     params = model.parameters()
-    updates, new_optimizer = transform_gradients(grads, optimizer, params=params)
+    updates, new_optimizer = transform_gradients(
+        grads.parameters(), optimizer, params=params
+    )
     new_params = apply_updates(params, updates=updates)
 
     if all_finite is not None:

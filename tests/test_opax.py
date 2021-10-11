@@ -127,7 +127,7 @@ def test_train_2():
 
     def update_fn(model, optimizer, inputs):
         (loss, model), grads = jax.value_and_grad(loss_fn, has_aux=True)(model, inputs)
-        model, optimizer = pax.apply_gradients(model, optimizer, grads=grads)
+        model, optimizer = opax.apply_gradients(model, optimizer, grads=grads)
         return model, optimizer, loss
 
     x = jnp.zeros((1, 1))
@@ -149,7 +149,7 @@ def test_train_flatten():
 
     def update_fn(model, optimizer, inputs):
         (loss, model), grads = jax.value_and_grad(loss_fn, has_aux=True)(model, inputs)
-        model, optimizer = pax.apply_gradients(model, optimizer, grads=grads)
+        model, optimizer = opax.apply_gradients(model, optimizer, grads=grads)
         return model, optimizer, loss
 
     x = jnp.zeros((1, 1))
