@@ -1,9 +1,11 @@
 import jax
 import numpy as np
-import opax
 import pax
 
+import opax
 
+
+@pax.pure
 def test_opax_schedule_sgd():
     model = pax.nn.Linear(3, 3)
     scheduler = opax.schedule.exponential_decay(1.0, 10_000)
@@ -12,6 +14,7 @@ def test_opax_schedule_sgd():
     params = opax.apply_updates(params, opt(params))
 
 
+@pax.pure
 def test_opax_schedule_adam():
     model = pax.nn.Linear(3, 3)
     scheduler = opax.schedule.exponential_decay(1.0, 10_000)
@@ -20,6 +23,7 @@ def test_opax_schedule_adam():
     params = opax.apply_updates(params, opt(params, params))
 
 
+@pax.pure
 def test_opax_schedule_adamw():
     model = pax.nn.Linear(3, 3)
     scheduler = opax.schedule.exponential_decay(1.0, 10_000)
@@ -28,6 +32,7 @@ def test_opax_schedule_adamw():
     params = opax.apply_updates(params, opt(params, params))
 
 
+@pax.pure
 def test_opax_schedule_adamw_lr():
     model = pax.nn.Linear(3, 3)
     scheduler = opax.schedule.exponential_decay(1.0, 10_000)
@@ -40,6 +45,7 @@ def test_opax_schedule_adamw_lr():
     )
 
 
+@pax.pure
 def test_opax_schedule_adamw_lr_jaxpr():
     model = pax.nn.Linear(3, 3)
     scheduler = opax.schedule.exponential_decay(1.0, 10_000)

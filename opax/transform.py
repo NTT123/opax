@@ -19,7 +19,7 @@ class GradientTransformation(pax.Module):
 
 def identity():
     class Identity(GradientTransformation):
-        def __call__(self, updates, params):
+        def __call__(self, updates, params=None):
             return updates
 
     return Identity
@@ -168,7 +168,7 @@ def add_decayed_weights(weight_decay: float = 0.0):
         def __init__(self, params):
             super().__init__(params=params)
 
-        def __call__(self, updates, params):
+        def __call__(self, updates, params=None):
             assert params is not None, "expecting params argument"
 
             updates = jax.tree_map(lambda g, p: g + weight_decay * p, updates, params)
@@ -195,13 +195,12 @@ def _bias_correction(moment, decay, count):
 def ema(decay_rate: float, debias: bool = True):
     class EMA(GradientTransformation):
         ema: Any
+        count: jnp.ndarray
 
         def __init__(self, params):
             super().__init__()
             self.register_state("count", jnp.array(0, dtype=jnp.int32))
-            self.register_states(
-                "ema", jax.tree_map(lambda x: jnp.zeros_like(x), params)
-            )
+            self.register_states("ema", jax.tree_map(jnp.zeros_like, params))
 
         def __call__(self, updates, params=None):
             del params
@@ -228,12 +227,8 @@ def scale_by_adam(
         def __init__(self, params):
             super().__init__(params)
 
-            self.register_states(
-                "mu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
-            )
-            self.register_states(
-                "nu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
-            )
+            self.register_states("mu", jax.tree_map(jnp.zeros_like, params))
+            self.register_states("nu", jax.tree_map(jnp.zeros_like, params))
             self.register_state("count", jnp.array(0, dtype=jnp.int32))
 
         def __call__(self, updates, params=None):

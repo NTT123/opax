@@ -24,7 +24,8 @@ optimizer = opax.adam(1e-4)(parameters)
 To update parameters:
 
 ```python
-new_parameters = optimizer.step(gradients, parameters)
+updates, optimizer = opax.transfrom_gradients(gradients, optimizer, parameters)
+parameters = opax.apply_update(parameters, updates)
 ```
 
 **Note**: ``gradients`` has the same `treedef` as `parameters`.

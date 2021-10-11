@@ -1,11 +1,13 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-import opax
 import pax
 import pytest
 
+import opax
 
+
+@pax.pure
 def test_opax_1():
     model = pax.nn.Linear(3, 3)
     learning_rate = 1e-3
@@ -19,6 +21,7 @@ def test_opax_1():
     params = opax.apply_updates(params, updates)
 
 
+@pax.pure
 def test_opax_sgd():
     model = pax.nn.Linear(3, 3)
     opt = opax.chain(
@@ -29,6 +32,7 @@ def test_opax_sgd():
     params = opax.apply_updates(params, updates)
 
 
+@pax.pure
 def test_opax_step_sgd():
     model = pax.nn.Linear(3, 3)
     opt = opax.chain(
@@ -39,6 +43,7 @@ def test_opax_step_sgd():
     params = opax.apply_updates(params, updates)
 
 
+@pax.pure
 def test_opax_adam():
     model = pax.nn.Linear(3, 3)
     opt = opax.adam(1e-3)(model.parameters())
@@ -47,6 +52,7 @@ def test_opax_adam():
     params = opax.apply_updates(params, updates)
 
 
+@pax.pure
 def test_trace():
     x = jnp.array(1.0)
     t = opax.trace(0.9)(x)
@@ -58,6 +64,7 @@ def test_trace():
     np.testing.assert_almost_equal(t.trace, 0.9 * 0.9 + 1.0)
 
 
+@pax.pure
 def test_opax_global_norm():
     model = pax.nn.Linear(3, 3)
     opt = opax.chain(
@@ -86,6 +93,7 @@ def test_opax_global_norm():
 #     assert opt[-1][0].count.item() == 1
 
 
+@pax.pure
 def test_train_1():
     net = pax.nn.Linear(1, 1)
 
@@ -105,6 +113,7 @@ def test_train_1():
         net, opt, _ = update_fn(net, opt, (x, x))
 
 
+@pax.pure
 def test_train_2():
     net = pax.nn.Sequential(
         pax.nn.Linear(1, 2),
@@ -113,7 +122,7 @@ def test_train_2():
 
     def loss_fn(model, inputs):
         loss = jnp.mean(jnp.square(model(inputs[0]) - inputs[1]))
-        model[-1] = pax.nn.Lambda(jax.nn.relu)
+        model = model.set(-1, pax.nn.Lambda(jax.nn.relu))
         return loss, model
 
     def update_fn(model, optimizer, inputs):
