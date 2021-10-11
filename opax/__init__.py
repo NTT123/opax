@@ -14,4 +14,4 @@ from .transform import (
     scale_by_stddev,
     trace,
 )
-from .utils import apply_updates
+from .utils import apply_gradients, apply_updates, transform_gradients
