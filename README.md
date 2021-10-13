@@ -1,6 +1,6 @@
 # opax
 
-`opax` is an optimizer library for Jax. It is a reimplementation of [optax] using `Pax`'s stateful [module](https://github.com/ntt123/pax).
+`opax` is an optimizer library for JAX. It is a reimplementation of [optax] using PAX's stateful [module](https://github.com/ntt123/pax).
 
 ## Installation
 

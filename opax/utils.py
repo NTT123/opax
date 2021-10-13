@@ -5,15 +5,15 @@ from typing import Any, Optional, Tuple, TypeVar
 import jax
 import jax.numpy as jnp
 import jmp
+from pax import Module, assert_structure_equal, module_and_value
 
-from pax import Module, pure, assertStructureEqual
 from .transform import GradientTransformation
 
 TreeDef = Any
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Module)
-O = TypeVar("O", bound=GradientTransformation)
+O = TypeVar("O", bound=Module)
 
 
 def transform_gradients(grads: T, optimizer: O, params: T) -> Tuple[T, O]:
@@ -32,12 +32,7 @@ def transform_gradients(grads: T, optimizer: O, params: T) -> Tuple[T, O]:
     """
 
     assert isinstance(optimizer, GradientTransformation), "Expecting an OPAX optimizer."
-
-    def _run(optimizer):
-        updates = optimizer(grads, params=params)
-        return optimizer, updates
-
-    optimizer, updates = pure(_run)(optimizer)
+    optimizer, updates = module_and_value(optimizer)(grads, params=params)
     return updates, optimizer
 
 
@@ -48,7 +43,7 @@ def apply_updates(params: T, updates: T) -> T:
         params: The trainable parameters.
         updates: The transformed gradients.
     """
-    assertStructureEqual(updates, params)
+    assert_structure_equal(updates, params)
     return jax.tree_map(lambda u, p: p - u, updates, params)
 
 

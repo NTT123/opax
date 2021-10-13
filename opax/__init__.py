@@ -1,4 +1,4 @@
-"""Pax optimizer library."""
+"""PAX optimizer library."""
 
 from . import optimizer, schedule
 from .optimizer import adam, adamw, rmsprop, sgd

@@ -52,19 +52,17 @@ def test_opax_adam():
     params = opax.apply_updates(params, updates)
 
 
-@pax.pure
 def test_trace():
     x = jnp.array(1.0)
     t = opax.trace(0.9)(x)
-    t(x)
+    t, _ = pax.module_and_value(t)(x)
     assert t.trace.item() == 1.0
-    t(x * 0.0)
+    t, _ = pax.module_and_value(t)(x * 0.0)
     np.testing.assert_almost_equal(t.trace, 0.9)
-    t(x)
+    t, _ = pax.module_and_value(t)(x)
     np.testing.assert_almost_equal(t.trace, 0.9 * 0.9 + 1.0)
 
 
-@pax.pure
 def test_opax_global_norm():
     model = pax.nn.Linear(3, 3)
     opt = opax.chain(
@@ -72,7 +70,7 @@ def test_opax_global_norm():
         opax.scale(1e-3),
     )(model.parameters())
     params = model.parameters()
-    updates = opt(params, params)
+    opt, updates = pax.module_and_value(opt)(params, params)
     params = opax.apply_updates(params, updates)
 
     assert opt[0].global_norm >= 0.0
