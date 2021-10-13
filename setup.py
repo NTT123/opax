@@ -1,9 +1,21 @@
 from setuptools import find_packages, setup
 
-__version__ = "0.2.3rc1"
+
+def _get_version():
+    with open("opax/__init__.py", encoding="utf-8") as fp:
+        for line in fp:
+            if line.startswith("__version__"):
+                g = {}
+                exec(line, g)  # pylint: disable=exec-used
+                return g["__version__"]
+        raise ValueError("`__version__` not defined in `opax/__init__.py`")
+
+
+__version__ = _get_version()
+
 url = "https://github.com/ntt123/opax"
 
-install_requires = ["pax3 >= 0.4.0rc3"]
+install_requires = ["pax3>=0.4.0"]
 setup_requires = []
 tests_require = []
 
@@ -11,7 +23,7 @@ setup(
     name="opax",
     version=__version__,
     description="A stateful optimizer library for JAX",
-    long_description=open("README.md").read(),
+    long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     author="Thông Nguyễn",
     url=url,

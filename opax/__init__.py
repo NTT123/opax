@@ -15,3 +15,5 @@ from .transform import (
     trace,
 )
 from .utils import apply_gradients, apply_updates, transform_gradients
+
+__version__ = "0.2.3"
