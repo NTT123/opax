@@ -4,8 +4,6 @@ from typing import Callable, Optional, Union
 import jax.numpy as jnp
 
 ScheduleFn = Callable[[jnp.ndarray], jnp.ndarray]
-
-
 ScheduleOrFloat = Union[Callable, float]
 
 

@@ -1,12 +1,10 @@
 """Gradient Transformations."""
 
-from typing import Any, Callable, Optional, Sequence, TypeVar
+from typing import Any, Callable, Sequence, TypeVar
 
 import jax
 import jax.numpy as jnp
 import pax
-
-from .utils import select_tree
 
 T = TypeVar("T")
 
@@ -18,44 +16,10 @@ class GradientTransformation(pax.Module):
     def __call__(self, updates, params=None):
         raise NotImplementedError("A subclass must implement this method")
 
-    def step(self, grads, params, all_finite: Optional[jnp.ndarray] = None):
-        """An optimizing step.
-
-        First, transform gradients
-        Second, apply updates to parameters.
-
-        If `all_finite` is False, no update is applied.
-
-        Arguments:
-            grads: The gradients.
-            params: The model parameters that will be updated.
-            all_finite: if the gradients are all finite. Default: `None`.
-        """
-        if jax.tree_structure(grads) != jax.tree_structure(params):
-            raise ValueError(
-                f"Mismatched between `grads` and `params` tree structures.\n"
-                f"Usually, this is due to a modification in the forward pass.\n\n"
-                f"[grads]\n{jax.tree_structure(grads)}\n\n"
-                f"========\n\n"
-                f"[params]\n{jax.tree_structure(params)}\n"
-            )
-        if all_finite is None:
-            updates = self(grads, params)
-            return jax.tree_map(lambda p, u: p - u, params, updates)
-        else:
-            clone = self.copy()
-            updates = self(grads, params)
-            new_params = jax.tree_map(lambda p, u: p - u, params, updates)
-            finite_params, finite_self = select_tree(
-                all_finite, (new_params, self), (params, clone)
-            )
-            self.update(finite_self, in_place=True)
-            return finite_params
-
 
 def identity():
     class Identity(GradientTransformation):
-        def __call__(self, updates, params):
+        def __call__(self, updates, params=None):
             return updates
 
     return Identity
@@ -78,8 +42,8 @@ def scale_by_schedule(schedule_fn: Callable[[jnp.ndarray], jnp.ndarray]):
         def __init__(self, params):
             super().__init__(params=params)
             self.schedule_fn = schedule_fn
-            self.register_states("count", jnp.array(0, dtype=jnp.int32))
-            self.register_states("learning_rate", jnp.array(0.0, dtype=jnp.float32))
+            self.register_state("count", jnp.array(0, dtype=jnp.int32))
+            self.register_state("learning_rate", jnp.array(0.0, dtype=jnp.float32))
 
         def __call__(self, updates, params=None):
             del params
@@ -100,7 +64,7 @@ def scale_by_stddev(
             super().__init__(params=params)
             self.register_states(
                 "mu",
-                jax.tree_map(jnp.zeros_likes, params),
+                jax.tree_map(jnp.zeros_like, params),
             )
             self.register_states(
                 "nu",
@@ -166,7 +130,7 @@ def clip_by_global_norm(max_global_norm: float):
 
         def __init__(self, params):
             super().__init__(params=params)
-            self.register_states("global_norm", jnp.array(0.0))
+            self.register_state("global_norm", jnp.array(0.0))
 
         def __call__(self, updates, params=None):
             del params
@@ -204,7 +168,7 @@ def add_decayed_weights(weight_decay: float = 0.0):
         def __init__(self, params):
             super().__init__(params=params)
 
-        def __call__(self, updates, params):
+        def __call__(self, updates, params=None):
             assert params is not None, "expecting params argument"
 
             updates = jax.tree_map(lambda g, p: g + weight_decay * p, updates, params)
@@ -231,13 +195,12 @@ def _bias_correction(moment, decay, count):
 def ema(decay_rate: float, debias: bool = True):
     class EMA(GradientTransformation):
         ema: Any
+        count: jnp.ndarray
 
         def __init__(self, params):
             super().__init__()
-            self.register_states("count", jnp.array(0, dtype=jnp.int32))
-            self.register_states(
-                "ema", jax.tree_map(lambda x: jnp.zeros_like(x), params)
-            )
+            self.register_state("count", jnp.array(0, dtype=jnp.int32))
+            self.register_states("ema", jax.tree_map(jnp.zeros_like, params))
 
         def __call__(self, updates, params=None):
             del params
@@ -264,13 +227,9 @@ def scale_by_adam(
         def __init__(self, params):
             super().__init__(params)
 
-            self.register_states(
-                "mu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
-            )
-            self.register_states(
-                "nu", jax.tree_map(lambda x: jnp.zeros_like(x), params)
-            )
-            self.register_states("count", jnp.array(0, dtype=jnp.int32))
+            self.register_states("mu", jax.tree_map(jnp.zeros_like, params))
+            self.register_states("nu", jax.tree_map(jnp.zeros_like, params))
+            self.register_state("count", jnp.array(0, dtype=jnp.int32))
 
         def __call__(self, updates, params=None):
             del params
@@ -304,10 +263,9 @@ def chain(*fs: Callable[[Any], GradientTransformation]):
             self.flatten = flatten
             if flatten:
                 leaves = jax.tree_leaves(params)
-                transforms = [f(leaves) for f in fs]
+                self.transforms = [f(leaves) for f in fs]
             else:
-                transforms = [f(params) for f in fs]
-            self.register_modules("transforms", transforms)
+                self.transforms = [f(params) for f in fs]
 
         def __call__(self, updates, params=None):
             if self.flatten:

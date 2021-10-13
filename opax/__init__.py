@@ -1,4 +1,4 @@
-"""Pax optimizer library."""
+"""PAX optimizer library."""
 
 from . import optimizer, schedule
 from .optimizer import adam, adamw, rmsprop, sgd
@@ -14,3 +14,6 @@ from .transform import (
     scale_by_stddev,
     trace,
 )
+from .utils import apply_gradients, apply_updates, transform_gradients
+
+__version__ = "0.2.3"
