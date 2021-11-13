@@ -4,11 +4,10 @@ from typing import List, Mapping, Tuple
 
 import jax
 import jax.numpy as jnp
+import opax
 import pax
 import tensorflow_datasets as tfds
 from tqdm.auto import tqdm
-
-import opax
 
 Batch = Mapping[str, jnp.ndarray]
 
@@ -36,15 +35,14 @@ class ConvNet(pax.Module):
         return jnp.squeeze(x, (1, 2))
 
 
-@pax.pure
 def loss_fn(model: ConvNet, batch: Batch):
     x = batch["image"].astype(jnp.float32) / 255
     target = batch["label"]
-    logits = model(x)
+    model, logits = pax.module_and_value(model)(x)
     log_pr = jax.nn.log_softmax(logits, axis=-1)
     log_pr = jnp.sum(jax.nn.one_hot(target, log_pr.shape[-1]) * log_pr, axis=-1)
     loss = -jnp.mean(log_pr)
-    return loss, (loss, model)
+    return loss, model
 
 
 @jax.jit
@@ -54,9 +52,8 @@ def test_loss_fn(model: ConvNet, batch: Batch):
 
 
 @jax.jit
-def update_fn(model: ConvNet, optimizer: opax.GradientTransformation, batch: Batch):
-    grads, (loss, model) = jax.grad(loss_fn, has_aux=True, allow_int=int)(model, batch)
-    grads = grads.parameters()
+def train_step(model: ConvNet, optimizer: opax.GradientTransformation, batch: Batch):
+    (loss, model), grads = pax.value_and_grad(loss_fn, has_aux=True)(model, batch)
     params = model.parameters()
     updates, optimizer = opax.transform_gradients(grads, optimizer, params=params)
     new_params = opax.apply_updates(params, updates=updates)
@@ -76,6 +73,10 @@ def train(
     learning_rate=1e-4,
     weight_decay=1e-4,
 ):
+    # seed random key
+    pax.seed_rng_key(42)
+
+    # model & optimizer
     net = ConvNet()
     print(net.summary())
     optimizer = opax.chain(
@@ -83,14 +84,16 @@ def train(
         opax.adamw(learning_rate=learning_rate, weight_decay=weight_decay),
     )(net.parameters())
 
+    # data
     train_data = load_dataset("train").shuffle(10 * batch_size).batch(batch_size)
     test_data = load_dataset("test").shuffle(10 * batch_size).batch(batch_size)
 
+    # training loop
     for epoch in range(num_epochs):
         losses, global_norm = 0.0, 0.0
         for batch in tqdm(train_data, desc="train", leave=False):
             batch = jax.tree_map(lambda x: x.numpy(), batch)
-            net, optimizer, loss = update_fn(net, optimizer, batch)
+            net, optimizer, loss = train_step(net, optimizer, batch)
             losses = losses + loss
             global_norm = global_norm + optimizer[0].global_norm
         loss = losses / len(train_data)
@@ -103,10 +106,12 @@ def train(
         test_loss = test_losses / len(test_data)
 
         print(
-            f"[Epoch {epoch}]  train loss {loss:.3f}  test loss {test_loss:.3f}  global norm {global_norm:.3f}"
+            "[Epoch %d]  train loss %.3f  test loss %.3f  global norm %.3f"
+            % (epoch, loss, test_loss, global_norm)
         )
 
     return net
 
 
-train()
+if __name__ == "__main__":
+    train()
