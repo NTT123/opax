@@ -56,6 +56,7 @@ def test_loss_fn(model: ConvNet, batch: Batch):
 @jax.jit
 def update_fn(model: ConvNet, optimizer: opax.GradientTransformation, batch: Batch):
     grads, (loss, model) = jax.grad(loss_fn, has_aux=True, allow_int=int)(model, batch)
+    grads = grads.parameters()
     params = model.parameters()
     updates, optimizer = opax.transform_gradients(grads, optimizer, params=params)
     new_params = opax.apply_updates(params, updates=updates)
