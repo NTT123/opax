@@ -267,6 +267,11 @@ def chain(*fs: Callable[[Any], GradientTransformation]):
             else:
                 self.transforms = [f(params) for f in fs]
 
+        @classmethod
+        def init(cls, params, flatten: bool = False):
+            """Initialize gradient transformations."""
+            return cls(params=params, flatten=flatten)
+
         def __call__(self, updates, params=None):
             if self.flatten:
                 updates_leaves, updates_treedef = jax.tree_flatten(updates)
