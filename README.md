@@ -16,7 +16,7 @@ To create an optimizer:
 
 ```python
 import opax
-optimizer = opax.adam(1e-4)(parameters)
+optimizer = opax.adam(1e-4).init(parameters)
 ```
 
 **Note**: ``parameters`` is a pytree of trainable parameters.
@@ -39,7 +39,7 @@ optimizer = opax.chain(
     opax.clip_by_global_norm(1.0),
     opax.scale_by_adam(),
     opax.scale(1e-4),
-)(parameters)
+).init(parameters)
 ```
 
 ## Learning rate schedule
@@ -55,7 +55,7 @@ optimizer = opax.chain(
     opax.clip_by_global_norm(1.0),
     opax.scale_by_adam(),
     opax.scale_by_schedule(staircase_schedule_fn),
-)(parameters)
+).init(parameters)
 ```
 
 
