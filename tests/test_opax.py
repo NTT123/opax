@@ -1,13 +1,11 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+import opax
 import pax
 import pytest
 
-import opax
 
-
-@pax.pure
 def test_opax_1():
     model = pax.nn.Linear(3, 3)
     learning_rate = 1e-3
@@ -17,38 +15,35 @@ def test_opax_1():
         opax.scale(learning_rate),
     )(model.parameters())
     params = model.parameters()
-    updates = opt(params, params)
+    opt, updates = pax.module_and_value(opt)(params, params)
     params = opax.apply_updates(params, updates)
 
 
-@pax.pure
 def test_opax_sgd():
     model = pax.nn.Linear(3, 3)
     opt = opax.chain(
         opax.sgd(1e-2, 0.9),
     )(model.parameters())
     params = model.parameters()
-    updates = opt(params, params)
+    opt, updates = pax.module_and_value(opt)(params, params)
     params = opax.apply_updates(params, updates)
 
 
-@pax.pure
 def test_opax_step_sgd():
     model = pax.nn.Linear(3, 3)
     opt = opax.chain(
         opax.sgd(1e-2, 0.9),
     )(model.parameters())
     params = model.parameters()
-    updates = opt(params, params)
+    opt, updates = pax.module_and_value(opt)(params, params)
     params = opax.apply_updates(params, updates)
 
 
-@pax.pure
 def test_opax_adam():
     model = pax.nn.Linear(3, 3)
     opt = opax.adam(1e-3)(model.parameters())
     params = model.parameters()
-    updates = opt(params, params)
+    opt, updates = pax.module_and_value(opt)(params, params)
     params = opax.apply_updates(params, updates)
 
 
@@ -91,7 +86,6 @@ def test_opax_global_norm():
 #     assert opt[-1][0].count.item() == 1
 
 
-@pax.pure
 def test_train_1():
     net = pax.nn.Linear(1, 1)
 
@@ -101,7 +95,7 @@ def test_train_1():
 
     def update_fn(model, optimizer, inputs):
         (loss, model), grads = jax.value_and_grad(loss_fn, has_aux=True)(model, inputs)
-        updates = optimizer(grads)
+        optimizer, updates = pax.module_and_value(optimizer)(grads)
         model = model.update_parameters(opax.apply_updates(model.parameters(), updates))
         return model, optimizer, loss
 
@@ -111,7 +105,6 @@ def test_train_1():
         net, opt, _ = update_fn(net, opt, (x, x))
 
 
-@pax.pure
 def test_train_2():
     net = pax.nn.Sequential(
         pax.nn.Linear(1, 2),
