@@ -15,17 +15,17 @@ Batch = Mapping[str, jnp.ndarray]
 class ConvNet(pax.Module):
     """ConvNet module."""
 
-    layers: List[Tuple[pax.nn.Conv2D, pax.nn.BatchNorm2D]]
-    output: pax.nn.Conv2D
+    layers: List[Tuple[pax.Conv2D, pax.BatchNorm2D]]
+    output: pax.Conv2D
 
     def __init__(self):
         super().__init__()
         self.layers = []
         for i in range(5):
-            conv = pax.nn.Conv2D((1 if i == 0 else 32), 32, 6, padding="VALID")
-            batchnorm = pax.nn.BatchNorm2D(32, True, True, 0.9)
+            conv = pax.Conv2D((1 if i == 0 else 32), 32, 6, padding="VALID")
+            batchnorm = pax.BatchNorm2D(32, True, True, 0.9)
             self.layers.append((conv, batchnorm))
-        self.output = pax.nn.Conv2D(32, 10, 3, padding="VALID")
+        self.output = pax.Conv2D(32, 10, 3, padding="VALID")
 
     def __call__(self, x: jnp.ndarray):
         for conv, batchnorm in self.layers:

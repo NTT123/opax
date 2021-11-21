@@ -7,7 +7,7 @@ import pytest
 
 
 def test_opax_1():
-    model = pax.nn.Linear(3, 3)
+    model = pax.Linear(3, 3)
     learning_rate = 1e-3
     momentum = 0.9
     opt = opax.chain(
@@ -20,7 +20,7 @@ def test_opax_1():
 
 
 def test_opax_sgd():
-    model = pax.nn.Linear(3, 3)
+    model = pax.Linear(3, 3)
     opt = opax.chain(
         opax.sgd(1e-2, 0.9),
     )(model.parameters())
@@ -30,7 +30,7 @@ def test_opax_sgd():
 
 
 def test_opax_step_sgd():
-    model = pax.nn.Linear(3, 3)
+    model = pax.Linear(3, 3)
     opt = opax.chain(
         opax.sgd(1e-2, 0.9),
     )(model.parameters())
@@ -40,7 +40,7 @@ def test_opax_step_sgd():
 
 
 def test_opax_adam():
-    model = pax.nn.Linear(3, 3)
+    model = pax.Linear(3, 3)
     opt = opax.adam(1e-3)(model.parameters())
     params = model.parameters()
     opt, updates = pax.module_and_value(opt)(params, params)
@@ -59,7 +59,7 @@ def test_trace():
 
 
 def test_opax_global_norm():
-    model = pax.nn.Linear(3, 3)
+    model = pax.Linear(3, 3)
     opt = opax.chain(
         opax.clip_by_global_norm(1.0),
         opax.scale(1e-3),
@@ -72,7 +72,7 @@ def test_opax_global_norm():
 
 
 # def test_all_finite_predicate():
-#     model = pax.nn.Linear(3, 3)
+#     model = pax.Linear(3, 3)
 #     opt = opax.chain(
 #         opax.clip_by_global_norm(1.0),
 #         opax.adam(1e-3),
@@ -87,7 +87,7 @@ def test_opax_global_norm():
 
 
 def test_train_1():
-    net = pax.nn.Linear(1, 1)
+    net = pax.Linear(1, 1)
 
     def loss_fn(model, inputs):
         loss = jnp.mean(jnp.square(model(inputs[0]) - inputs[1]))
@@ -106,14 +106,14 @@ def test_train_1():
 
 
 def test_train_2():
-    net = pax.nn.Sequential(
-        pax.nn.Linear(1, 2),
-        pax.nn.Linear(2, 1),
+    net = pax.Sequential(
+        pax.Linear(1, 2),
+        pax.Linear(2, 1),
     )
 
     def loss_fn(model, inputs):
         loss = jnp.mean(jnp.square(model(inputs[0]) - inputs[1]))
-        model = model.set(-1, pax.nn.Lambda(jax.nn.relu))
+        model = model.set(-1, pax.Lambda(jax.nn.relu))
         return loss, model
 
     def update_fn(model, optimizer, inputs):
@@ -129,9 +129,9 @@ def test_train_2():
 
 
 def test_train_flatten():
-    net = pax.nn.Sequential(
-        pax.nn.Linear(1, 2),
-        pax.nn.Linear(2, 1),
+    net = pax.Sequential(
+        pax.Linear(1, 2),
+        pax.Linear(2, 1),
     )
 
     def loss_fn(model, inputs):
