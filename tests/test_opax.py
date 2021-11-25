@@ -147,3 +147,37 @@ def test_train_flatten():
     opt = opax.adam()(net.parameters(), flatten=True)
     for _ in range(10):
         net, opt, _ = update_fn(net, opt, (x, x))
+
+
+def test_non_strict():
+    class Att(pax.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc1 = pax.Linear(1, 2)
+            self.fc2 = pax.Linear(2, 1)
+
+        def __call__(self, x):
+            x = self.fc1(x)
+            x = jnp.tanh(x)
+            self.hidden = x
+            x = self.fc2(x)
+            return x
+
+    def loss_fn(model, x):
+        model, y = pax.purecall(model, x)
+        loss = jnp.mean(jnp.square(x - y))
+        return loss, model
+
+    @jax.jit
+    def train_step(model, optim, x):
+        (loss, model), grads = pax.value_and_grad(loss_fn, has_aux=True)(model, x)
+        model, optim = opax.apply_gradients(model, optim, grads)
+        return model, optim, loss
+
+    att = Att()
+    optim = opax.adam(1e-3).init(att.parameters(), strict=False)
+
+    x = jnp.ones((8, 1))
+
+    for i in range(10):
+        att, optim, _ = train_step(att, optim, x)

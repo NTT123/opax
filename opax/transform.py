@@ -1,6 +1,6 @@
 """Gradient Transformations."""
 
-from typing import Any, Callable, Sequence, TypeVar
+from typing import Any, Callable, Optional, Sequence, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -241,35 +241,42 @@ def chain(*fs: Callable[[Any], GradientTransformation]):
     class Chain(GradientTransformation):
         transforms: Sequence[GradientTransformation]
         flatten: bool
+        strict: Optional[bool]
 
-        def __init__(self, params, flatten: bool = False):
-            """Create a chain of gradient transformations.
-
-            Arguments:
-                params: trainable parameters.
-                flatten: flatten trainable parameters to a list for faster speed in jit mode.
-            """
+        def __init__(self, params, flatten: bool = False, strict=None):
+            """Create a chain of gradient transformations."""
             super().__init__()
+            if strict is True and flatten is True:
+                raise ValueError("Cannot set `flatten=True` in strict mode.")
             self.flatten = flatten
-            if flatten:
+            self.strict = strict
+            if flatten or strict is False:
                 leaves = jax.tree_leaves(params)
                 self.transforms = [f(leaves) for f in fs]
             else:
                 self.transforms = [f(params) for f in fs]
 
         @classmethod
-        def init(cls, params, flatten: bool = False):
-            """Initialize gradient transformations."""
-            return cls(params=params, flatten=flatten)
+        def init(cls, params, flatten: bool = False, strict=None):
+            """Initialize gradient transformations.
+
+            Arguments:
+                params: trainable parameters.
+                flatten: flatten trainable parameters to a list for faster speed.
+                strict: require tree structures to be matched.
+            """
+            return cls(params=params, flatten=flatten, strict=strict)
 
         def __call__(self, updates, params=None):
-            if self.flatten:
+            if self.flatten or self.strict is False:
                 updates_leaves, updates_treedef = jax.tree_flatten(updates)
-                params_leaves = jax.tree_leaves(params)
+                params_leaves, params_treedef = jax.tree_flatten(params)
 
                 for f in self.transforms:
                     updates_leaves = f(updates=updates_leaves, params=params_leaves)
 
+                if self.strict is False and params is not None:
+                    updates_treedef = params_treedef
                 updates = jax.tree_unflatten(updates_treedef, updates_leaves)
             else:
                 for f in self.transforms:
