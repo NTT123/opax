@@ -15,7 +15,7 @@ __version__ = _get_version()
 
 url = "https://github.com/ntt123/opax"
 
-install_requires = ["pax3>=0.4.3"]
+install_requires = ["pax3>=0.5.8"]
 setup_requires = []
 tests_require = []
 

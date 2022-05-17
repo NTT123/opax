@@ -116,6 +116,15 @@ def clip(max_delta: float):
     return Clip
 
 
+def _global_norm(x):
+    """
+    Compute the global norm of a pytree
+    """
+    leaves = jax.tree_leaves(x)
+    leaves = jax.tree_map(lambda x: jnp.sum(jnp.square(x)), leaves)
+    return jnp.sqrt(jnp.sum(jnp.stack(leaves)))
+
+
 def clip_by_global_norm(max_global_norm: float):
     class ClipByGlobalNorm(GradientTransformation):
         global_norm: jnp.ndarray  # for logging purposes.
@@ -126,9 +135,7 @@ def clip_by_global_norm(max_global_norm: float):
 
         def __call__(self, updates, params=None):
             del params
-            leaves = jax.tree_leaves(updates)
-            leaves = jax.tree_map(lambda x: jnp.sum(jnp.square(x)), leaves)
-            self.global_norm = jnp.sqrt(jnp.sum(jnp.stack(leaves)))
+            self.global_norm = _global_norm(updates)
             scale = jnp.clip(max_global_norm / self.global_norm, a_max=1.0)
             return jax.tree_map(lambda x: x * scale, updates)
 
@@ -235,6 +242,51 @@ def scale_by_adam(
             return updates
 
     return ScaleByAdam
+
+
+def differentially_private_aggregate(
+    l2_norm_clip: float, noise_multiplier: float, seed: int
+):
+    """
+    Return an differentially private optimizer class
+    """
+
+    class DifferentiallyPrivateAggreate(GradientTransformation):
+        """
+        DP optimizer which adds noise to the gradients.
+        """
+
+        rng_key: jnp.ndarray
+        noise_std = l2_norm_clip * noise_multiplier
+
+        def __init__(self, params):
+            super().__init__(params)
+            self.rng_key = jax.random.PRNGKey(seed=seed)
+
+        def __call__(self, updates, params=None):
+            del params
+            grads_flat, grads_treedef = jax.tree_flatten(updates)
+            bsize = grads_flat[0].shape[0]
+
+            if any(g.ndim == 0 or bsize != g.shape[0] for g in grads_flat):
+                raise ValueError(
+                    "Unlike other transforms, `differentially_private_aggregate` expects"
+                    " `updates` to have a batch dimension in the 0th axis. That is, this"
+                    " function expects per-example gradients as input."
+                )
+
+            self.rng_key, *rngs = jax.random.split(self.rng_key, len(grads_flat) + 1)
+            global_grad_norms = jax.vmap(_global_norm)(grads_flat)
+            divisors = jnp.maximum(global_grad_norms / l2_norm_clip, 1.0)
+            clipped = [(jnp.moveaxis(g, 0, -1) / divisors).sum(-1) for g in grads_flat]
+            noised = [
+                (g + self.noise_std * jax.random.normal(r, g.shape, g.dtype)) / bsize
+                for g, r in zip(clipped, rngs)
+            ]
+            updates = jax.tree_unflatten(grads_treedef, noised)
+            return updates
+
+    return DifferentiallyPrivateAggreate
 
 
 def chain(*fs: Callable[[Any], GradientTransformation]):

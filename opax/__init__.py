@@ -8,6 +8,7 @@ from .transform import (
     chain,
     clip,
     clip_by_global_norm,
+    differentially_private_aggregate,
     scale,
     scale_by_adam,
     scale_by_rms,
@@ -17,7 +18,7 @@ from .transform import (
 )
 from .utils import apply_gradients, apply_updates, transform_gradients
 
-__version__ = "0.2.8"
+__version__ = "0.2.9"
 
 __all__ = (
     "adam",
@@ -28,6 +29,7 @@ __all__ = (
     "chain",
     "clip_by_global_norm",
     "clip",
+    "differentially_private_aggregate",
     "GradientTransformation",
     "rmsprop",
     "scale_by_adam",
