@@ -43,7 +43,7 @@ def scale_by_schedule(schedule_fn: Callable[[jnp.ndarray], jnp.ndarray]):
             super().__init__(params=params)
             self.schedule_fn = schedule_fn
             self.count = jnp.array(0, dtype=jnp.int32)
-            self.learning_rate = jnp.array(0.0, dtype=jnp.float32)
+            self.learning_rate = self.schedule_fn(self.count)
 
         def __call__(self, updates, params=None):
             del params
