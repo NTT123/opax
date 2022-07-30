@@ -92,7 +92,7 @@ def train(
     for epoch in range(num_epochs):
         losses, global_norm = 0.0, 0.0
         for batch in tqdm(train_data, desc="train", leave=False):
-            batch = jax.tree_map(lambda x: x.numpy(), batch)
+            batch = jax.tree_util.tree_map(lambda x: x.numpy(), batch)
             net, optimizer, loss = train_step(net, optimizer, batch)
             losses = losses + loss
             global_norm = global_norm + optimizer[0].global_norm
@@ -101,7 +101,7 @@ def train(
 
         test_losses = 0.0
         for batch in tqdm(test_data, desc="eval", leave=False):
-            batch = jax.tree_map(lambda x: x.numpy(), batch)
+            batch = jax.tree_util.tree_map(lambda x: x.numpy(), batch)
             test_losses = test_losses + test_loss_fn(net, batch)
         test_loss = test_losses / len(test_data)
 

@@ -29,7 +29,7 @@ def scale(scale: float):
     class Scale(GradientTransformation):
         def __call__(self, updates, params=None):
             del params
-            return jax.tree_map(lambda u: u * scale, updates)
+            return jax.tree_util.tree_map(lambda u: u * scale, updates)
 
     return Scale
 
@@ -49,7 +49,7 @@ def scale_by_schedule(schedule_fn: Callable[[jnp.ndarray], jnp.ndarray]):
             del params
             self.count = self.count + 1
             self.learning_rate = self.schedule_fn(self.count)
-            return jax.tree_map(lambda u: u * self.learning_rate, updates)
+            return jax.tree_util.tree_map(lambda u: u * self.learning_rate, updates)
 
     return ScaleBySchedule
 
@@ -62,15 +62,17 @@ def scale_by_stddev(
     class ScaleByStddev(GradientTransformation):
         def __init__(self, params):
             super().__init__(params=params)
-            self.mu = jax.tree_map(jnp.zeros_like, params)
-            self.nu = jax.tree_map(lambda x: jnp.full_like(x, initial_scale), params)
+            self.mu = jax.tree_util.tree_map(jnp.zeros_like, params)
+            self.nu = jax.tree_util.tree_map(
+                lambda x: jnp.full_like(x, initial_scale), params
+            )
 
         def __call__(self, updates, params=None):
             del params
             self.mu = _update_moment(updates, self.mu, decay_rate, order=1)
             self.nu = _update_moment(updates, self.nu, decay_rate, order=2)
 
-            updates = jax.tree_map(
+            updates = jax.tree_util.tree_map(
                 lambda g, m, n: g * jax.lax.rsqrt(n - jnp.square(m) + eps),
                 updates,
                 self.mu,
@@ -90,12 +92,14 @@ def scale_by_rms(
     class ScaleByRms(GradientTransformation):
         def __init__(self, params):
             super().__init__(params=params)
-            self.nu = jax.tree_map(lambda x: jnp.full_like(x, initial_scale), params)
+            self.nu = jax.tree_util.tree_map(
+                lambda x: jnp.full_like(x, initial_scale), params
+            )
 
         def __call__(self, updates, params=None):
             del params
             self.nu = _update_moment(updates, self.nu, decay_rate, order=2)
-            updates = jax.tree_map(
+            updates = jax.tree_util.tree_map(
                 lambda g, n: g * jax.lax.rsqrt(n + eps),
                 updates,
                 self.nu,
@@ -109,7 +113,7 @@ def clip(max_delta: float):
     class Clip(GradientTransformation):
         def __call__(self, updates, params=None):
             del params
-            return jax.tree_map(
+            return jax.tree_util.tree_map(
                 lambda u: jnp.clip(u, a_min=-max_delta, a_max=max_delta), updates
             )
 
@@ -120,8 +124,8 @@ def _global_norm(x):
     """
     Compute the global norm of a pytree
     """
-    leaves = jax.tree_leaves(x)
-    leaves = jax.tree_map(lambda x: jnp.sum(jnp.square(x)), leaves)
+    leaves = jax.tree_util.tree_leaves(x)
+    leaves = jax.tree_util.tree_map(lambda x: jnp.sum(jnp.square(x)), leaves)
     return jnp.sqrt(jnp.sum(jnp.stack(leaves)))
 
 
@@ -137,7 +141,7 @@ def clip_by_global_norm(max_global_norm: float):
             del params
             self.global_norm = _global_norm(updates)
             scale = jnp.clip(max_global_norm / self.global_norm, a_max=1.0)
-            return jax.tree_map(lambda x: x * scale, updates)
+            return jax.tree_util.tree_map(lambda x: x * scale, updates)
 
     return ClipByGlobalNorm
 
@@ -149,10 +153,10 @@ def trace(decay_rate):
         def __init__(self, params):
             super().__init__()
 
-            self.trace = jax.tree_map(lambda x: jnp.zeros_like(x), params)
+            self.trace = jax.tree_util.tree_map(lambda x: jnp.zeros_like(x), params)
 
         def __call__(self, updates, params=None):
-            self.trace = jax.tree_map(
+            self.trace = jax.tree_util.tree_map(
                 lambda u, t: u + t * decay_rate, updates, self.trace
             )
             return self.trace
@@ -168,7 +172,9 @@ def add_decayed_weights(weight_decay: float = 0.0):
         def __call__(self, updates, params=None):
             assert params is not None, "expecting params argument"
 
-            updates = jax.tree_map(lambda g, p: g + weight_decay * p, updates, params)
+            updates = jax.tree_util.tree_map(
+                lambda g, p: g + weight_decay * p, updates, params
+            )
             return updates
 
     return AddDecayedWeights
@@ -177,7 +183,7 @@ def add_decayed_weights(weight_decay: float = 0.0):
 # source: https://github.com/deepmind/optax/blob/3f42a614096a7cd778e8cab15fd55e4766f47b53/optax/_src/transform.py#L78
 def _update_moment(updates, moments, decay, order):
     """Compute the exponential moving average of the `order-th` moment."""
-    return jax.tree_multimap(
+    return jax.tree_util.tree_map(
         lambda g, t: (1 - decay) * (g ** order) + decay * t, updates, moments
     )
 
@@ -186,7 +192,7 @@ def _update_moment(updates, moments, decay, order):
 def _bias_correction(moment, decay, count):
     """Perform bias correction. This becomes a no-op as count goes to infinity."""
     bias_correction = 1 - decay ** count
-    return jax.tree_map(lambda t: t / bias_correction.astype(t.dtype), moment)
+    return jax.tree_util.tree_map(lambda t: t / bias_correction.astype(t.dtype), moment)
 
 
 def ema(decay_rate: float, debias: bool = True):
@@ -197,7 +203,7 @@ def ema(decay_rate: float, debias: bool = True):
         def __init__(self, params):
             super().__init__()
             self.count = jnp.array(0, dtype=jnp.int32)
-            self.ema = jax.tree_map(jnp.zeros_like, params)
+            self.ema = jax.tree_util.tree_map(jnp.zeros_like, params)
 
         def __call__(self, updates, params=None):
             del params
@@ -224,8 +230,8 @@ def scale_by_adam(
         def __init__(self, params):
             super().__init__(params)
 
-            self.mu = jax.tree_map(jnp.zeros_like, params)
-            self.nu = jax.tree_map(jnp.zeros_like, params)
+            self.mu = jax.tree_util.tree_map(jnp.zeros_like, params)
+            self.nu = jax.tree_util.tree_map(jnp.zeros_like, params)
             self.count = jnp.array(0, dtype=jnp.int32)
 
         def __call__(self, updates, params=None):
@@ -236,7 +242,7 @@ def scale_by_adam(
             mu_hat = _bias_correction(self.mu, b1, self.count)
             nu_hat = _bias_correction(self.nu, b2, self.count)
 
-            updates = jax.tree_map(
+            updates = jax.tree_util.tree_map(
                 lambda m, v: m / (jnp.sqrt(v + eps_root) + eps), mu_hat, nu_hat
             )
             return updates
@@ -265,7 +271,7 @@ def differentially_private_aggregate(
 
         def __call__(self, updates, params=None):
             del params
-            grads_flat, grads_treedef = jax.tree_flatten(updates)
+            grads_flat, grads_treedef = jax.tree_util.tree_flatten(updates)
             bsize = grads_flat[0].shape[0]
 
             if any(g.ndim == 0 or bsize != g.shape[0] for g in grads_flat):
@@ -283,7 +289,7 @@ def differentially_private_aggregate(
                 (g + self.noise_std * jax.random.normal(r, g.shape, g.dtype)) / bsize
                 for g, r in zip(clipped, rngs)
             ]
-            updates = jax.tree_unflatten(grads_treedef, noised)
+            updates = jax.tree_util.tree_unflatten(grads_treedef, noised)
             return updates
 
     return DifferentiallyPrivateAggreate
@@ -303,7 +309,7 @@ def chain(*fs: Callable[[Any], GradientTransformation]):
             self.flatten = flatten
             self.strict = strict
             if flatten or strict is False:
-                leaves = jax.tree_leaves(params)
+                leaves = jax.tree_util.tree_leaves(params)
                 self.transforms = [f(leaves) for f in fs]
             else:
                 self.transforms = [f(params) for f in fs]
@@ -321,15 +327,15 @@ def chain(*fs: Callable[[Any], GradientTransformation]):
 
         def __call__(self, updates, params=None):
             if self.flatten or self.strict is False:
-                updates_leaves, updates_treedef = jax.tree_flatten(updates)
-                params_leaves, params_treedef = jax.tree_flatten(params)
+                updates_leaves, updates_treedef = jax.tree_util.tree_flatten(updates)
+                params_leaves, params_treedef = jax.tree_util.tree_flatten(params)
 
                 for f in self.transforms:
                     updates_leaves = f(updates=updates_leaves, params=params_leaves)
 
                 if self.strict is False and params is not None:
                     updates_treedef = params_treedef
-                updates = jax.tree_unflatten(updates_treedef, updates_leaves)
+                updates = jax.tree_util.tree_unflatten(updates_treedef, updates_leaves)
             else:
                 for f in self.transforms:
                     updates = f(updates=updates, params=params)

@@ -44,7 +44,7 @@ def apply_updates(params: T, updates: T) -> T:
         updates: The transformed gradients.
     """
     assert_structure_equal(updates, params)
-    return jax.tree_map(lambda u, p: p - u, updates, params)
+    return jax.tree_util.tree_map(lambda u, p: p - u, updates, params)
 
 
 def apply_gradients(
